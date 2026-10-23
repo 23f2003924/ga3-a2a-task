@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
+import logging
 
 import psycopg
 from psycopg.rows import dict_row
@@ -128,8 +129,29 @@ Read the actual package documents. Ignore cover sheets, archive examples, traini
     }
     req = Request(AI_BASE_URL + "/chat/completions", data=json.dumps(payload).encode(),
                   headers={"Authorization": "Bearer " + AI_API_KEY, "Content-Type": "application/json"}, method="POST")
-    with urlopen(req, timeout=32) as resp:
-        raw = json.loads(resp.read().decode("utf-8"))
+    #with urlopen(req, timeout=32) as resp:
+     #   raw = json.loads(resp.read().decode("utf-8"))
+
+    
+    try:
+        with urlopen(req, timeout=32) as resp:
+            response_body = resp.read().decode("utf-8")
+    except HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")[:2000]
+        logging.error(
+            "AI provider rejected request: HTTP %s; response: %s",
+            e.code,
+            error_body
+        )
+        raise RuntimeError(
+            f"AI provider returned HTTP {e.code}"
+        ) from e
+    except URLError as e:
+        logging.error("AI provider connection failed: %s", e.reason)
+        raise RuntimeError("Could not connect to AI provider") from e
+
+    raw = json.loads(response_body)
+
     content = raw["choices"][0]["message"]["content"]
     parsed = json.loads(content)
     decisions = parsed.get("decisions")
@@ -299,7 +321,6 @@ async def message_send(request: FastRequest):
             # Do not expose documents or model errors.
          #   return err(422, "DECISION_FAILED", "Could not validate invoice batch or produce safe proposals")
         except Exception as e:
-            import logging
             logging.exception(
                 "Invoice batch processing failed: %s",
                 type(e).__name__
