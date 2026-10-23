@@ -295,9 +295,20 @@ async def message_send(request: FastRequest):
                             {"batchId": batch["batchId"], "principalHash": principal})
             store_task(principal, task, message_id, msg_hash)
             return A2AJSONResponse(content={"task": task})
-        except Exception as e:
+        #except Exception as e:
             # Do not expose documents or model errors.
-            return err(422, "DECISION_FAILED", "Could not validate invoice batch or produce safe proposals")
+         #   return err(422, "DECISION_FAILED", "Could not validate invoice batch or produce safe proposals")
+        except Exception as e:
+            import logging
+            logging.exception(
+                "Invoice batch processing failed: %s",
+                type(e).__name__
+            )
+            return err(
+                422,
+                "DECISION_FAILED",
+                "Could not validate invoice batch or produce safe proposals"
+            )
     if results is not None:
         return handle_results(principal, msg, results, message_id, msg_hash)
     return err(400, "UNSUPPORTED_INPUT", "Expected invoice batch or invoice action results data part")
